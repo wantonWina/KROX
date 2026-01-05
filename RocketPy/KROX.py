@@ -44,8 +44,13 @@ AIR_vapour = Fluid(name="Air", density=10)              #kg/m^3 at 20C? bleh
 
 #last i checked, the engine is eating at a constant m-dot, so mass flow tanks it will be
 
-OXtank_fillMass = OX_liquid.density * OXtank_geometry.total_volume #assuming 100% flled initial tank
-KRtank_fillMass = KR_liquid.density * KRtank_geometry.total_volume #assuming 100% flled initial tank
+# Leave small ullage (0.1%) to avoid numerical precision issues at initialization
+OXtank_fillMass = OX_liquid.density * OXtank_geometry.total_volume * 0.999
+KRtank_fillMass = KR_liquid.density * KRtank_geometry.total_volume * 0.999
+
+# Initial gas mass for small ullage space
+OXtank_initial_gas = AIR_vapour.density * OXtank_geometry.total_volume * 0.001
+KRtank_initial_gas = AIR_vapour.density * KRtank_geometry.total_volume * 0.001
 
 KRtank_flameballtime = (KRtank_fillMass - (burnDuration_engine * KRmDot_engine)) / KRmDot_engine #firing is OX limited. this figuring out leftover time the tank is dumping fuel
 
@@ -107,10 +112,10 @@ OXtank = MassFlowRateBasedTank(
     liquid=OX_liquid,
     gas=AIR_vapour,                 #hey so, is it just ox vapour? wouldnt it be both? someone run to mixed gas properties
     initial_liquid_mass=OXtank_fillMass,
-    initial_gas_mass=0,             #assumed fully filled
+    initial_gas_mass=OXtank_initial_gas,  #small ullage to avoid numerical issues
     liquid_mass_flow_rate_in=0,     #should be 0
     liquid_mass_flow_rate_out=OXmDot_engine,
-    gas_mass_flow_rate_in=OX_gasMdot,     
+    gas_mass_flow_rate_in=OX_gasMdot,  #pressurant gas flows in to maintain pressure
     gas_mass_flow_rate_out=0,    #well. none zero due to boil off. neglected 
     discretize=100,              # i did not understand this
 )
