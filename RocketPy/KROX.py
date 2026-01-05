@@ -5,8 +5,12 @@ from rocketpy import Fluid
 from rocketpy import LiquidMotor
 from rocketpy import CylindricalTank, MassFlowRateBasedTank
 
+
+#these are also used as approximatons for gas entering prop tanks
 OXmDot_engine = 1 #kg/sec
 KRmDot_engine = 0.5 #kg/sec
+
+
 burnDuration_engine = 10 #seconds with OX running out first
 thurst_engine = units.convert_units(1200, "lb", "kg")
 dryweight_engine = units.convert_units(2, "lb", "kg")
@@ -44,10 +48,9 @@ OXtank_fillMass = OX_liquid.density * OXtank_geometry.total_volume #assuming 100
 KRtank_fillMass = KR_liquid.density * KRtank_geometry.total_volume #assuming 100% flled initial tank
 
 KRtank_flameballtime = (KRtank_fillMass - burnDuration_engine * KRmDot_engine) / KRmDot_engine #firing is OX limited. this figuring out leftover time the tank is dumping fuel
-print("going")
 
 
-#""" test code from rocktpy
+""" test code from rocktpy
 
 
 # Define fluids
@@ -88,32 +91,44 @@ fuel_tank = MassFlowRateBasedTank(
     gas=fuel_gas,
 )
 """
+
+
+# i think i see it. there are two volumes in the prop tank, and they need to sorta match i think. 
+# the error that was being thrown earlier was saying that the gas volume bubble wasnt matching or 
+# was significantly off from liquid volume bubble
+
+
+KR_gasMdot = KRmDot_engine * (1/KR_liquid.density) * AIR_vapour.density
+OX_gasMdot = OXmDot_engine * (1/OX_liquid.density) * AIR_vapour.density
+
+
+
 OXtank = MassFlowRateBasedTank(
     name="Liquid Oxygen Tank",
-    geometry=OXtank_geometry,    #defined earlier
-    flux_time=burnDuration_engine-1,          #engine burn time basically.
-    liquid=OX_liquid,            #defined earlier
-    gas=OX_vapour,               #hey so, is it just ox vapour? wouldnt it be both? someone run to mixed gas properties
-    initial_liquid_mass=OXtank_fillMass,    #earlier
-    initial_gas_mass=0,       #smol amount 
-    liquid_mass_flow_rate_in=0,  #should be
+    geometry=OXtank_geometry,
+    flux_time=burnDuration_engine-1,    #engine burn time basically.
+    liquid=OX_liquid,
+    gas=AIR_vapour,                 #hey so, is it just ox vapour? wouldnt it be both? someone run to mixed gas properties
+    initial_liquid_mass=OXtank_fillMass,
+    initial_gas_mass=0,             #assumed fully filled
+    liquid_mass_flow_rate_in=0,     #should be 0
     liquid_mass_flow_rate_out=OXmDot_engine,
-    gas_mass_flow_rate_in=0.15,     #well. how much...?
-    gas_mass_flow_rate_out=0.05,    #well. none zero due to boil off. 
+    gas_mass_flow_rate_in=OX_gasMdot,     
+    gas_mass_flow_rate_out=0,    #well. none zero due to boil off. neglected 
     discretize=100,              # i did not understand this
 )
-
+"""
 KRtank = MassFlowRateBasedTank(
     name="Kerosene Tank",
-    geometry=KRtank_geometry,    #defined earlier
+    geometry=KRtank_geometry,
     flux_time=burnDuration_engine+KRtank_flameballtime,     #how long does tank need to be worried about
-    liquid=KR_liquid,            #defined earlier
+    liquid=KR_liquid,            
     gas=AIR_vapour,              #all air
-    initial_liquid_mass=KRtank_fillMass,    #earlier
-    initial_gas_mass=0,       #smol amount 
+    initial_liquid_mass=KRtank_fillMass,
+    initial_gas_mass=0,          #basically 0
     liquid_mass_flow_rate_in=0,  #should be
     liquid_mass_flow_rate_out=KRmDot_engine,
-    gas_mass_flow_rate_in=0.3,     #well. how much...?
+    gas_mass_flow_rate_in=KR_gasMdot,    
     gas_mass_flow_rate_out=0,    #basically 0. 
     discretize=100,              # i did not understand this
 )
@@ -132,4 +147,5 @@ KROXengine.add_tank(tank=OXtank, position=1.0)
 KROXengine.add_tank(tank=KRtank, position=2.5)
 
 KROXengine.info()
+
 #"""
