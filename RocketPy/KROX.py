@@ -46,11 +46,11 @@ AIR_vapour = Fluid(name="Air", density=10)             #kg/m^3 at 20C? bleh
 
 # Leave small ullage (0.1%) to avoid numerical precision issues at initialization
 OXtank_fillMass = OX_liquid.density * OXtank_geometry.total_volume * 0.999
-KRtank_fillMass = KR_liquid.density * KRtank_geometry.total_volume * 0.999
+KRtank_fillMass = KR_liquid.density * KRtank_geometry.total_volume * 0.99
 
 # Initial gas mass for small ullage space
 OXtank_initial_gas = AIR_vapour.density * OXtank_geometry.total_volume * 0.001
-KRtank_initial_gas = AIR_vapour.density * KRtank_geometry.total_volume * 0.001
+KRtank_initial_gas = AIR_vapour.density * KRtank_geometry.total_volume * 0.01
 
 KRtank_flameballtime = (KRtank_fillMass - (burnDuration_engine * KRmDot_engine)) / KRmDot_engine #firing is OX limited. this figuring out leftover time the tank is dumping fuel
 
@@ -108,7 +108,7 @@ OX_gasMdot = OXmDot_engine * (1/OX_liquid.density) * AIR_vapour.density
 OXtank = MassFlowRateBasedTank(
     name="Liquid Oxygen Tank",
     geometry=OXtank_geometry,
-    flux_time=burnDuration_engine-1,    #engine burn time basically.
+    flux_time=burnDuration_engine,    #engine burn time basically.
     liquid=OX_liquid,
     gas=AIR_vapour,                 #hey so, is it just ox vapour? wouldnt it be both? someone run to mixed gas properties
     initial_liquid_mass=OXtank_fillMass,
@@ -120,9 +120,9 @@ OXtank = MassFlowRateBasedTank(
     discretize=100,                     #i did not understand this
 )
 
-OXtank.info()
+#OXtank.info()
 
-"""
+
 KRtank = MassFlowRateBasedTank(
     name="Kerosene Tank",
     geometry=KRtank_geometry,
@@ -130,14 +130,15 @@ KRtank = MassFlowRateBasedTank(
     liquid=KR_liquid,            
     gas=AIR_vapour,              #all air
     initial_liquid_mass=KRtank_fillMass,
-    initial_gas_mass=0,          #basically 0
+    initial_gas_mass=OXtank_initial_gas,    #small ullage to avoid numerical issues
     liquid_mass_flow_rate_in=0,  #should be
     liquid_mass_flow_rate_out=KRmDot_engine,
     gas_mass_flow_rate_in=KR_gasMdot,    
     gas_mass_flow_rate_out=0,    #basically 0. 
     discretize=100,              # i did not understand this
 )
-
+KRtank.info()
+"""
 
 KROXengine = LiquidMotor(
     coordinate_system_orientation="nozzle_to_combustion_chamber", #positive torwards to combustion chamber
