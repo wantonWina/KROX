@@ -15,7 +15,7 @@ OXmDot_engine = OFratio_engine*KRmDot_engine
 
     
 burnDuration_engine = 10 #seconds with OX running out first
-thurst_engine = units.convert_units(1200, "lb", "kg")
+thrust_engine = 1200 * 4.44822  # Convert lbf to N (1 lbf = 4.44822 N)
 dryweight_engine = units.convert_units(2, "lb", "kg")
 nozzleOutletRadius_engine = 0.075 #Radius of motor nozzle outlet in meters.
 centerOfDryMassPositionRelativeToNozzle_engine = units.convert_units(8, "in", "m") #exit of nozzle is at origin.
@@ -30,29 +30,43 @@ tankLengthOX = units.convert_units(32, "in", "m")
 tankRadiusKR = units.convert_units(5.562/2, "in", "m")
 tankLengthKR = units.convert_units(24, "in", "m")
 
-#creating tank geometry objects. standard ones here, not detailed. 
-OXtank_geometry = CylindricalTank(radius=0.1, height=2.0, spherical_caps=True)
-KRtank_geometry = CylindricalTank(radius=0.1, height=2.0, spherical_caps=True)
+# Tank geometry configuration
+ULLAGE_FRACTION = 0.005  # 0.5% ullage space to avoid numerical precision issues with actual dimensions
 
-#defining our fluids, kerosene, lox, air. These values are approximated from engineering toolbox
-#this uh, more accurate please LOL
-OX_liquid = Fluid(name="Liquid Oxygen", density=1000)  #kg/m^3 somehwere near -100degC, somewhere near 50bara 
-OX_vapour = Fluid(name="Vapour Oxygen", density=26)    #kg/m^3 somehwere near -100degC, somewhere near 10bara 
+#creating tank geometry objects using actual dimensions
+OXtank_geometry = CylindricalTank(radius=tankRadiusOX, height=tankLengthOX, spherical_caps=True)
+KRtank_geometry = CylindricalTank(radius=tankRadiusKR, height=tankLengthKR, spherical_caps=True)
 
-KR_liquid = Fluid(name="Liquid Kerosene", density=800) #kg/m^3 range was given as 775/840 o.o
-AIR_vapour = Fluid(name="Air", density=10)             #kg/m^3 at 20C? bleh
+# Fluid definitions - densities approximated for operating conditions
+# LOX: ~-183°C, 50 bar | Kerosene: ~20°C, 50 bar | Air pressurant: ~20°C, ~10-50 bar
+OX_liquid = Fluid(name="Liquid Oxygen", density=1141)  # kg/m³ at -183°C (more accurate)
+OX_vapour = Fluid(name="Vapour Oxygen", density=26)    # kg/m³ at low temp, ~10 bar
 
-#last i checked, the engine is eating at a constant m-dot, so mass flow tanks it will be
+KR_liquid = Fluid(name="Liquid Kerosene", density=810) # kg/m³ (RP-1 typical: 806-820)
+AIR_vapour = Fluid(name="Air", density=10)             # kg/m³ compressed air pressurant
 
-# Leave small ullage (0.1%) to avoid numerical precision issues at initialization
-OXtank_fillMass = OX_liquid.density * OXtank_geometry.total_volume * 0.999
-KRtank_fillMass = KR_liquid.density * KRtank_geometry.total_volume * 0.999
+# Mass flow rate based tank calculations (constant engine mass flow rate)
 
-# Initial gas mass for small ullage space
-OXtank_initial_gas = AIR_vapour.density * OXtank_geometry.total_volume * 0.001
-KRtank_initial_gas = AIR_vapour.density * KRtank_geometry.total_volume * 0.001
+# Calculate initial liquid mass leaving small ullage space for pressurant
+OXtank_fillMass = OX_liquid.density * OXtank_geometry.total_volume * (1 - ULLAGE_FRACTION)
+KRtank_fillMass = KR_liquid.density * KRtank_geometry.total_volume * (1 - ULLAGE_FRACTION)
 
-KRtank_flameballtime = (KRtank_fillMass - (burnDuration_engine * KRmDot_engine)) / KRmDot_engine #firing is OX limited. this figuring out leftover time the tank is dumping fuel
+# Initial pressurant gas mass in ullage space
+OXtank_initial_gas = AIR_vapour.density * OXtank_geometry.total_volume * ULLAGE_FRACTION
+KRtank_initial_gas = AIR_vapour.density * KRtank_geometry.total_volume * ULLAGE_FRACTION
+
+# Calculate actual burn duration based on available propellant (OX runs out first)
+actual_OX_burn_time = OXtank_fillMass / OXmDot_engine
+actual_KR_burn_time = KRtank_fillMass / KRmDot_engine
+burnDuration_actual = min(actual_OX_burn_time, actual_KR_burn_time)
+
+print(f"Tank capacity analysis:")
+print(f"  OX available: {OXtank_fillMass:.2f} kg -> {actual_OX_burn_time:.2f} s burn time")
+print(f"  KR available: {KRtank_fillMass:.2f} kg -> {actual_KR_burn_time:.2f} s burn time")
+print(f"  Actual burn duration (OX-limited): {burnDuration_actual:.2f} s")
+print(f"  Note: Original specified burn time was {burnDuration_engine} s\\n")
+
+KRtank_flameballtime = (KRtank_fillMass - (burnDuration_actual * KRmDot_engine)) / KRmDot_engine #firing is OX limited. this figuring out leftover time the tank is dumping fuel
 
 
 """ test code from rocktpy
@@ -102,13 +116,14 @@ fuel_tank = MassFlowRateBasedTank(
 # the error that was being thrown earlier was saying that the gas volume bubble wasnt matching or 
 # was significantly off from liquid volume bubble
 
-KR_gasMdot = KRmDot_engine * (1/KR_liquid.density) * AIR_vapour.density
-OX_gasMdot = OXmDot_engine * (1/OX_liquid.density) * AIR_vapour.density
+# Gas inflow calculation - disabled because ullage gas naturally expands as liquid leaves
+KR_gasMdot = 0  # Ullage gas expands to fill space
+OX_gasMdot = 0  # Ullage gas expands to fill space
 
 OXtank = MassFlowRateBasedTank(
     name="Liquid Oxygen Tank",
     geometry=OXtank_geometry,
-    flux_time=burnDuration_engine-1,    #engine burn time basically.
+    flux_time=burnDuration_actual * 0.99,  # Use 99% of burn time to avoid numerical edge case
     liquid=OX_liquid,
     gas=AIR_vapour,                 #hey so, is it just ox vapour? wouldnt it be both? someone run to mixed gas properties
     initial_liquid_mass=OXtank_fillMass,
@@ -130,7 +145,7 @@ KRtank = MassFlowRateBasedTank(
     liquid=KR_liquid,            
     gas=AIR_vapour,              #all air
     initial_liquid_mass=KRtank_fillMass,
-    initial_gas_mass=0,          #basically 0
+    initial_gas_mass=KRtank_initial_gas,          #basically 0
     liquid_mass_flow_rate_in=0,  #should be
     liquid_mass_flow_rate_out=KRmDot_engine,
     gas_mass_flow_rate_in=KR_gasMdot,    
@@ -143,13 +158,14 @@ KROXengine = LiquidMotor(
     coordinate_system_orientation="nozzle_to_combustion_chamber", #positive torwards to combustion chamber
     center_of_dry_mass_position=centerOfDryMassPositionRelativeToNozzle_engine,
     nozzle_position=0, #nozzle exit area to coord sys
-    thrust_source= thurst_engine,
+    thrust_source=thrust_engine,
     dry_mass=dryweight_engine,
     dry_inertia=(0.125, 0.125, 0.002),           #uhm, need this.
     nozzle_radius=nozzleOutletRadius_engine,
     burn_time=burnDuration_engine,
 )
 KROXengine.add_tank(tank=OXtank, position=1.0)
+KROXengine.add_tank(tank=KRtank, position=2.5)
 KROXengine.add_tank(tank=KRtank, position=2.5)
 
 KROXengine.info()
