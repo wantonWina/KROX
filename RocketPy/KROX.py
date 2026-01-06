@@ -15,7 +15,7 @@ OXmDot_engine = OFratio_engine*KRmDot_engine
 
     
 burnDuration_engine = 10 #seconds with OX running out first
-thurst_engine = units.convert_units(1200, "lb", "kg")
+thurst_engine = units.convert_units(1200, "lb", "kg")*9.81
 dryweight_engine = units.convert_units(2, "lb", "kg")
 nozzleOutletRadius_engine = 0.075 #Radius of motor nozzle outlet in meters.
 centerOfDryMassPositionRelativeToNozzle_engine = units.convert_units(8, "in", "m") #exit of nozzle is at origin.
@@ -105,6 +105,7 @@ fuel_tank = MassFlowRateBasedTank(
 KR_gasMdot = KRmDot_engine * (1/KR_liquid.density) * AIR_vapour.density
 OX_gasMdot = OXmDot_engine * (1/OX_liquid.density) * AIR_vapour.density
 
+
 OXtank = MassFlowRateBasedTank(
     name="Liquid Oxygen Tank",
     geometry=OXtank_geometry,
@@ -122,7 +123,6 @@ OXtank = MassFlowRateBasedTank(
 
 OXtank.info()
 
-"""
 KRtank = MassFlowRateBasedTank(
     name="Kerosene Tank",
     geometry=KRtank_geometry,
@@ -137,7 +137,7 @@ KRtank = MassFlowRateBasedTank(
     gas_mass_flow_rate_out=0,    #basically 0. 
     discretize=100,              # i did not understand this
 )
-
+KRtank.info()
 
 KROXengine = LiquidMotor(
     coordinate_system_orientation="nozzle_to_combustion_chamber", #positive torwards to combustion chamber
@@ -152,6 +152,8 @@ KROXengine = LiquidMotor(
 KROXengine.add_tank(tank=OXtank, position=1.0)
 KROXengine.add_tank(tank=KRtank, position=2.5)
 
-KROXengine.info()
+KROXengine.all_info()
 
+
+# KROXengine.propellant_mass.plot(0, )
 #"""
